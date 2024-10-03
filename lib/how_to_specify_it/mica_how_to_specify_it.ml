@@ -153,6 +153,7 @@ let bug_test (module M : BST) : unit =
 (** The main executable code: performs differential testing of all 8 buggy 
     BST implementations with [BST0] (an implementation known to be correct) *)
 let () =
+  printf "Note: this executable is intended to fail!\n";
   printf "Catching bug 1:\n";
   bug_test (module BST1);
   printf "Catching bug 2:\n";
