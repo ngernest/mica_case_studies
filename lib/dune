@@ -1,0 +1,12 @@
+(library
+ (name mica_case_studies)
+ (libraries
+  mica_charsets
+  mica_how_to_specify_it
+  mica_maps
+  mica_regexes
+  mica_sets
+  mica_student_submissions
+  mica_unsigned_ints
+  mica_queues
+  mica_polynomials))
