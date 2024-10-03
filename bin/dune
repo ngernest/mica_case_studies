@@ -1,4 +1,0 @@
-(executable
- (public_name mica_case_studies)
- (name main)
- (libraries mica_case_studies))
