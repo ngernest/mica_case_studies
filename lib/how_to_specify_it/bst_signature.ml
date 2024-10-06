@@ -1,4 +1,5 @@
-(** A module signature for binary search trees *)
+(** A module signature for binary search trees representing finite maps, 
+    where each node stores a key-value pair *)
 module type BST = sig
   type ('k, 'v) t
 
