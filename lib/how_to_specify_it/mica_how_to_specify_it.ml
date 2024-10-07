@@ -13,6 +13,7 @@ open Bst
    - certain [let open] statements to prevent namespace clashes *)
 
 module Mica = struct
+  (* Symbolic expressions *)
   type expr =
     | Nil
     | Find of int * expr
@@ -24,8 +25,10 @@ module Mica = struct
     | Size of expr
   [@@deriving show { with_path = false }]
 
+  (* The types of symbolic expressions *)
   type ty = T | Int | IntList | IntIntList | IntOption
 
+  (* QuickCheck generator for symbolic expressions of type [ty] *)
   let rec gen_expr (ty : ty) : expr Generator.t =
     let open Base_quickcheck.Generator in
     let open Let_syntax in
@@ -61,7 +64,9 @@ module Mica = struct
         Union (t1, t2) in
       union [ gen_insert; gen_delete; gen_union ]
 
+  (* Interpretation functor: interprets symbolic expressions over module [M] *)
   module Interpret (M : BST) = struct
+    (* The subset of [expr]s that are [value]s *)
     type value =
       | ValInt of int
       | ValIntOption of int option
@@ -70,6 +75,7 @@ module Mica = struct
       | ValT of (int, int) Bst.t
     [@@deriving show { with_path = false }]
 
+    (* Evaluates an [expr] over the module [M], returning a [value] *)
     let rec interp (expr : expr) : value =
       match expr with
       | Nil -> ValT M.nil
@@ -103,29 +109,35 @@ module Mica = struct
         | _ -> failwith "impossible")
   end
 
+  (* Test harness functor: performs differential testing of modules [M1] &
+     [M2] *)
   module TestHarness (M1 : BST) (M2 : BST) = struct
     module I1 = Interpret (M1)
     module I2 = Interpret (M2)
     open Core
 
+    (* Tests observational equivalence at type [int] *)
     let test_int () : unit =
       Quickcheck.test (gen_expr Int) ~f:(fun e ->
           match (I1.interp e, I2.interp e) with
           | ValInt n1, ValInt n2 -> [%test_eq: int] n1 n2
           | v1, v2 -> failwith "failed int")
 
+    (* Tests observational equivalence at type [int option] *)
     let test_int_option () : unit =
       Quickcheck.test (gen_expr IntOption) ~f:(fun e ->
           match (I1.interp e, I2.interp e) with
           | ValIntOption n1, ValIntOption n2 -> [%test_eq: int option] n1 n2
           | v1, v2 -> failwith "failed int option")
 
+    (* Tests observational equivalence at type [int list] *)
     let test_int_list () : unit =
       Quickcheck.test (gen_expr IntList) ~f:(fun e ->
           match (I1.interp e, I2.interp e) with
           | ValIntList xs, ValIntList ys -> [%test_eq: int list] xs ys
           | _ -> failwith "failed int list")
 
+    (* Tests observational equivalence at type [(int * int) list] *)
     let test_int_int_list () : unit =
       Quickcheck.test (gen_expr IntIntList) ~f:(fun e ->
           match (I1.interp e, I2.interp e) with
@@ -133,6 +145,7 @@ module Mica = struct
             [%test_eq: (int * int) list] xs ys
           | _ -> failwith "failed (int * int) list")
 
+    (* Runs all observational equivalence tests end to end *)
     let run_tests () : unit =
       test_int ();
       test_int_option ();

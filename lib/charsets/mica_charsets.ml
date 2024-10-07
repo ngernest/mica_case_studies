@@ -12,29 +12,27 @@ module M2 = Yallop_Charset
    argument to [Quickcheck.test] (to aid debugging).   *)
 
 module Mica = struct
+  (* Symbolic expressions *)
   type expr =
-    (* T *)
     | Empty
     | Add of char * expr
     | Remove of char * expr
     | Union of expr * expr
     | Inter of expr * expr
     | Diff of expr * expr
-    (* Bool *)
     | Disjoint of expr * expr
     | Is_empty of expr
-    (* Int *)
     | Cardinal of expr
-    (* CharList *)
     | Elements of expr
-    (* CharOption *)
     | Min_elt_opt of expr
     | Max_elt_opt of expr
     | Choose_opt of expr
   [@@deriving show { with_path = false }, sexp_of]
 
+  (* The types of symbolic expressions *)
   type ty = Bool | Int | CharOption | CharList | T
 
+  (* QuickCheck generator for symbolic expressions of type [ty] *)
   let rec gen_expr (ty : ty) : expr Generator.t =
     let open Let_syntax in
     let%bind k = size in
@@ -77,7 +75,9 @@ module Mica = struct
         return @@ Inter (e1, e2) in
       union [ gen_add; gen_remove; gen_union; gen_inter ]
 
+  (* Interpretation functor: interprets symbolic expressions over module [M] *)
   module Interpret (M : S) = struct
+    (* The subset of [expr]s that are [value]s *)
     type value =
       | ValBool of bool
       | ValInt of int
@@ -85,6 +85,7 @@ module Mica = struct
       | ValCharList of char list
       | ValT of M.t
 
+    (* Evaluates an [expr] over the module [M], returning a [value] *)
     let rec interp (expr : expr) : value =
       match expr with
       | Empty -> ValT M.empty
@@ -138,39 +139,46 @@ module Mica = struct
         | _ -> failwith "impossible")
   end
 
+  (* Test harness functor: performs differential testing of modules [M1] &
+     [M2] *)
   module TestHarness (M1 : S) (M2 : S) = struct
     module I1 = Interpret (M1)
     module I2 = Interpret (M2)
     open Core
 
-    let test_bool () =
+    (* Tests observational equivalence at type [bool] *)
+    let test_bool () : unit =
       Quickcheck.test (gen_expr Bool) ~sexp_of:sexp_of_expr ~f:(fun e ->
           match (I1.interp e, I2.interp e) with
           | ValBool bool__041_, ValBool bool__040_ ->
             [%test_eq: bool] bool__041_ bool__040_
           | _ -> failwith "impossible")
 
-    let test_int () =
+    (* Tests observational equivalence at type [int] *)
+    let test_int () : unit =
       Quickcheck.test (gen_expr Int) ~sexp_of:sexp_of_expr ~f:(fun e ->
           match (I1.interp e, I2.interp e) with
           | ValInt int__043_, ValInt int__042_ ->
             [%test_eq: int] int__043_ int__042_
           | _ -> failwith "impossible")
 
-    let test_char_option () =
+    (* Tests observational equivalence at type [char option] *)
+    let test_char_option () : unit =
       Quickcheck.test (gen_expr CharOption) ~sexp_of:sexp_of_expr ~f:(fun e ->
           match (I1.interp e, I2.interp e) with
           | ValCharOption char_option__047, ValCharOption char_option__046 ->
             [%test_eq: char option] char_option__047 char_option__046
           | _ -> failwith "impossible")
 
-    let test_char_list () =
+    (* Tests observational equivalence at type [char list] *)
+    let test_char_list () : unit =
       Quickcheck.test (gen_expr CharList) ~sexp_of:sexp_of_expr ~f:(fun e ->
           match (I1.interp e, I2.interp e) with
           | ValCharList char_list__049, ValCharList char_list__048 ->
             [%test_eq: char list] char_list__049 char_list__048
           | _ -> failwith "impossible")
 
+    (* Runs all observational equivalence tests end to end *)
     let run_tests () =
       test_bool ();
       test_int ();
@@ -179,6 +187,11 @@ module Mica = struct
       printf "Mica: OK, passed %d observational equivalence tests.\n" 40000
   end
 end
+
+(******************************************************************************)
+(* User code: using Mica to check observational equivalence of two
+   implementations of character sets ([Set.Make(Char)] from the standard library
+   and the [charset] library) *)
 
 module T = Mica.TestHarness (Stdlib_Charset) (Yallop_Charset)
 

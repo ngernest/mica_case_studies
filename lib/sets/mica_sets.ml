@@ -4,6 +4,7 @@ open Set_impls
 (* Code automatically derived by Mica below *)
 
 module Mica = struct
+  (* Symbolic expressions *)
   type expr =
     | Empty
     | Is_empty of expr
@@ -15,9 +16,11 @@ module Mica = struct
     | Intersect of expr * expr
   [@@deriving show { with_path = false }]
 
+  (* The types of symbolic expressions *)
   type ty = Bool | Int | IntT [@@deriving show { with_path = false }]
 
-  let rec gen_expr ty =
+  (* QuickCheck generator for symbolic expressions of type [ty] *)
+  let rec gen_expr (ty : ty) : expr Base_quickcheck.Generator.t =
     let open Core in
     let open Quickcheck.Generator in
     let open Let_syntax in
@@ -64,12 +67,15 @@ module Mica = struct
         Intersect (e__023_, e__024_) in
       union [ gen_add; gen_rem; gen_union; gen_intersect ]
 
+  (* Interpretation functor: interprets symbolic expressions over module [M] *)
   module Interpret (M : S) = struct
     open M
 
+    (* The subset of [expr]s that are [value]s *)
     type value = ValBool of bool | ValInt of int | ValIntT of int t
 
-    let rec interp e =
+    (* Evaluates an [expr] over the module [M], returning a [value] *)
+    let rec interp (e : expr) : value =
       match e with
       | Empty -> ValIntT M.empty
       | Is_empty expr__025_ -> (
@@ -104,23 +110,28 @@ module Mica = struct
         | _ -> failwith "impossible: n-ary constructor")
   end
 
+  (* Test harness functor: performs differential testing of modules [M1] &
+     [M2] *)
   module TestHarness (M1 : S) (M2 : S) = struct
     module I1 = Interpret (M1)
     module I2 = Interpret (M2)
     open Core
 
+    (* Tests observational equivalence at type [bool] *)
     let test_bool () : unit =
       Quickcheck.test (gen_expr Bool) ~f:(fun e ->
           match (I1.interp e, I2.interp e) with
           | ValBool b1, ValBool b2 -> [%test_eq: bool] b1 b2
           | _ -> failwith "failed bool")
 
+    (* Tests observational equivalence at type [int] *)
     let test_int () : unit =
       Quickcheck.test (gen_expr Int) ~f:(fun e ->
           match (I1.interp e, I2.interp e) with
           | ValInt i1, ValInt i2 -> [%test_eq: int] i1 i2
           | _ -> failwith "failed int")
 
+    (* Runs all observational equivalence tests end to end *)
     let run_tests () : unit =
       test_bool ();
       test_int ();
@@ -129,8 +140,8 @@ module Mica = struct
 end
 
 (******************************************************************************)
-(* Using Mica to check observational equivalence of two implementations of
-   finite sets *)
+(* User code: using Mica to check observational equivalence of two
+   implementations of finite sets *)
 
 module T = Mica.TestHarness (ListSet) (BSTSet)
 

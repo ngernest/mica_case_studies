@@ -12,6 +12,7 @@ open Base_quickcheck
      [quickcheck_generator_char]) *)
 
 module Mica = struct
+  (* Symbolic expressions *)
   type expr =
     | Void
     | Empty
@@ -22,8 +23,10 @@ module Mica = struct
     | MatchString of expr * string
     | AcceptsEmpty of expr
 
+  (* The types of symbolic expressions *)
   type ty = Bool | T
 
+  (* QuickCheck generator for symbolic expressions of type [ty] *)
   let rec gen_expr (ty : ty) : expr Generator.t =
     let open Generator in
     let open Let_syntax in
@@ -56,11 +59,14 @@ module Mica = struct
         g >>| fun e -> Star e in
       union [ gen_lit; gen_alt; gen_cat; gen_start ]
 
+  (* Interpretation functor: interprets symbolic expressions over module [M] *)
   module Interpret (M : S) = struct
     include M
 
+    (* The subset of [expr]s that are [value]s *)
     type value = ValBool of bool | ValT of M.t
 
+    (* Evaluates an [expr] over the module [M], returning a [value] *)
     let rec interp (expr : expr) : value =
       match expr with
       | Void -> ValT M.void
@@ -88,17 +94,21 @@ module Mica = struct
         | _ -> failwith "impossible")
   end
 
+  (* Test harness functor: performs differential testing of modules [M1] &
+     [M2] *)
   module TestHarness (M1 : S) (M2 : S) = struct
     module I1 = Interpret (M1)
     module I2 = Interpret (M2)
     open Core
 
+    (* Tests observational equivalence at type [bool] *)
     let test_bool () : unit =
       Quickcheck.test (gen_expr Bool) ~f:(fun e ->
           match (I1.interp e, I2.interp e) with
           | ValBool b1, ValBool b2 -> [%test_eq: bool] b1 b2
           | _ -> failwith "failed bool")
 
+    (* Runs all observational equivalence tests end to end *)
     let run_tests () : unit =
       test_bool ();
       printf "Mica: OK, passed %d observational equivalence tests.\n" 10000
@@ -106,8 +116,8 @@ module Mica = struct
 end
 
 (******************************************************************************)
-(* Using Mica to check observational equivalence of two implementations of
-   regular expression matchers below: *)
+(* User code: using Mica to check observational equivalence of two
+   implementations of finite sets *)
 
 module T = Mica.TestHarness (DFA) (Brzozowski)
 

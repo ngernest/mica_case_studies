@@ -5,6 +5,7 @@ open Unsigned_int_impls
 
 module Mica = struct
   include struct
+    (* Symbolic expressions *)
     type expr =
       | Add of expr * expr
       | Sub of expr * expr
@@ -29,10 +30,12 @@ module Mica = struct
       | To_int64 of expr
     [@@deriving show { with_path = false }]
 
+    (* The types of symbolic expressions *)
     type ty = Bool | Int | Int64 | String | T
     [@@deriving show { with_path = false }]
 
-    let rec gen_expr ty =
+    (* QuickCheck generator for symbolic expressions of type [ty] *)
+    let rec gen_expr (ty : ty) : expr Base_quickcheck.Generator.t =
       let open Core in
       let open Quickcheck.Generator in
       let open Let_syntax in
@@ -138,9 +141,11 @@ module Mica = struct
           ]
   end
 
+  (* Interpretation functor: interprets symbolic expressions over module [M] *)
   module Interpret (M : S) = struct
     open M
 
+    (* The subset of [expr]s that are [value]s *)
     type value =
       | ValBool of bool
       | ValInt of int
@@ -148,7 +153,8 @@ module Mica = struct
       | ValT of t
       | ValInt64 of int64
 
-    let rec interp e =
+    (* Evaluates an [expr] over the module [M], returning a [value] *)
+    let rec interp (e : expr) : value =
       match e with
       | Add (expr__051_, expr__052_) -> (
         match (interp expr__051_, interp expr__052_) with
@@ -228,35 +234,42 @@ module Mica = struct
         | _ -> failwith "impossible")
   end
 
+  (* Test harness functor: performs differential testing of modules [M1] &
+     [M2] *)
   module TestHarness (M1 : S) (M2 : S) = struct
     module I1 = Interpret (M1)
     module I2 = Interpret (M2)
     open Core
 
+    (* Tests observational equivalence at type [bool] *)
     let test_bool () : unit =
       Quickcheck.test (gen_expr Bool) ~f:(fun e ->
           match (I1.interp e, I2.interp e) with
           | ValBool b1, ValBool b2 -> [%test_eq: bool] b1 b2
           | _ -> failwith "failed bool")
 
+    (* Tests observational equivalence at type [int] *)
     let test_int () : unit =
       Quickcheck.test (gen_expr Int) ~f:(fun e ->
           match (I1.interp e, I2.interp e) with
           | ValInt i1, ValInt i2 -> [%test_eq: int] i1 i2
           | _ -> failwith "failed int")
 
+    (* Tests observational equivalence at type [int64] *)
     let test_int64 () : unit =
       Quickcheck.test (gen_expr Int64) ~f:(fun e ->
           match (I1.interp e, I2.interp e) with
           | ValInt64 i1, ValInt64 i2 -> [%test_eq: int64] i1 i2
           | _ -> failwith "failed int")
 
+    (* Tests observational equivalence at type [string] *)
     let test_string () : unit =
       Quickcheck.test (gen_expr String) ~f:(fun e ->
           match (I1.interp e, I2.interp e) with
           | ValString s1, ValString s2 -> [%test_eq: string] s1 s2
           | _ -> failwith "failed int")
 
+    (* Runs all observational equivalence tests end to end *)
     let run_tests () : unit =
       test_bool ();
       test_int ();
@@ -267,8 +280,9 @@ module Mica = struct
 end
 
 (******************************************************************************)
-(* Using Mica to check observational equivalence of two implementations of
-   8/16/32/64-bit unsigned integer arithmetic below: *)
+(* User code: using Mica to check observational equivalence of two
+   implementations of 8/16/32/64-bit unsigned integer arithmetic (taken from the
+   [stdint] and [ocaml-integer] libraries) *)
 
 let () =
   let module T8 = Mica.TestHarness (U8_1) (U8_2) in
