@@ -1,6 +1,9 @@
 # Mica Case Studies
 
-This repo contains case studies for Mica, a PPX that automates differential testing for OCaml modules. The [main Mica repo](https://github.com/ngernest/mica) contains more details on Mica.
+This repo contains case studies for Mica, a PPX that automates differential testing for OCaml modules. 
+A simple webapp demonstrating Mica (using the case studies in this repo) is available [here](https://ngernest.github.io/mica/demo.html). 
+
+The [main Mica repo](https://github.com/ngernest/mica) contains more details on Mica.
 
 For each example (where possible), we have included an executable which runs the PBT code automatically produced by Mica.
 
